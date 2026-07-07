@@ -71,6 +71,13 @@ def nthImplausible(ems, x, z, n = None, maxImp = math.inf,
         
     """
     
+    if np.shape(x)[0] == 0:
+        if getRaw:
+            return pd.DataFrame(index=x.index if hasattr(x, "index") else [])
+        if cutoff is None:
+            return np.array([], dtype=float)
+        return np.array([], dtype=bool)
+
     if isinstance(ems, Emulator):
         if not ems.outputName in list(z.keys()):
             raise KeyError("Target not found corresponding to named emulator.")

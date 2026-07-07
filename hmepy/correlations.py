@@ -28,6 +28,8 @@ def getDist(df1, df2):
     if len(df1.columns.intersection(df2.columns)) != df1.shape[1]:
         raise TypeError("Dimensions of DataFrames do not match.")
     df2 = df2[list(df1.columns.values)]
+    df1 = pd.DataFrame(np.real_if_close(df1.to_numpy()).astype(float), columns=df1.columns)
+    df2 = pd.DataFrame(np.real_if_close(df2.to_numpy()).astype(float), columns=df2.columns)
     return np.transpose(pairwise_distances(df1, df2))
 
 # def getDist(df1, df2):
