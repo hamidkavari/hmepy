@@ -1,3 +1,7 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "hmepy"
 version = "1.7.0"
@@ -9,6 +13,9 @@ dependencies = [
     "importlib-metadata",
     "matplotlib",
 ]
+
+[tool.hatch.build.targets.wheel]
+packages = ["hmepy"]
 
 [tool.pytest.ini_options]
 pythonpath = [
