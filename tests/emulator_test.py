@@ -6,7 +6,7 @@ from hmepy.emulator import *
 from hmepy.utils import *
 
 class testEmBasic(unittest.TestCase):
-    basisF = [lambda x: 1, lambda x: x[0]]
+    basisF = [lambda x: 1, lambda x: np.asarray(x)[0]]
     bet = {'mu': [1,1], 'sigma': np.zeros((2,2))}
     u = {'sigma': 2, 'corr': Correlator()}
     ranges = {'x': [0,2]}
