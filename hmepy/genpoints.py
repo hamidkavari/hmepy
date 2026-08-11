@@ -45,13 +45,13 @@ def inRange(data, ranges):
     return isBigger & isSmaller
 
 ## Function to obtain an approximate maximin sample from a set of proposed points
-def maximinSample(points, n, reps = 1000):
+def maximinSample(points, n, reps = 100):
     sampleList = np.zeros((reps, n))
     measureList = np.zeros(reps)
     for i in range(reps):
         sampleIndex = random.sample(range(np.shape(points)[0]), n)
         sampledVals = points.iloc[sampleIndex,:]
-        measure = [math.dist(sampledVals.iloc[i,:], sampledVals.iloc[j,:]) for i in range(sampledVals.shape[0]) for j in np.arange(start = i+1, stop = sampledVals.shape[1])]
+        measure = [math.dist(sampledVals.iloc[i,:], sampledVals.iloc[j,:]) for i in range(sampledVals.shape[0]) for j in np.arange(start = i+1, stop = sampledVals.shape[0])]
         sampleList[i,:] = sampleIndex
         measureList[i] = min(measure)
     bestIndices = sampleList[np.argmax(measureList),:]
@@ -256,6 +256,8 @@ def generateNewDesign(ems, nPoints, z, method = "default", cutoff = 3,
         nems = len(np.unique([e.outputName for e in ems]))
         if nems > 10: opts['nth'] = 2
         else: opts['nth'] = 1
+    if callable(opts['accept_measure']):
+        iFunc = lambda ems, x, z, **kwargs: opts['accept_measure'](ems, x, z, n = opts['nth'], **kwargs)
     if isinstance(opts['accept_measure'], str) and opts['accept_measure'] == 'default':
         iFunc = lambda ems, x, z, **kwargs: nthImplausible(ems, x, z, n = opts['nth'], **kwargs)
     if isinstance(method, str) and method == "default":
