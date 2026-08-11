@@ -12,6 +12,13 @@ __all__ = ['collectEmulators', 'getRanges',
 'importEmulatorFromJSON', 'exportEmulatorToJSON',
 'spaceReduction']
 
+def _is_emulator_like(value):
+    return isinstance(value, Emulator) or (
+        hasattr(value, "outputName")
+        and hasattr(value, "ranges")
+        and hasattr(value, "implausibility")
+    )
+
 def collectEmulators(ems, targets = None, cutoff = 3,
                      ordering = ['p', 'i', 'v'], sampleSize = 200):
     '''
@@ -57,12 +64,12 @@ def collectEmulators(ems, targets = None, cutoff = 3,
     A flattened list of emulators, ordered with respect to the chosen metrics.
     '''
     
-    if isinstance(ems, Emulator):
-        return {ems.outputName: ems}
-    if all(isinstance(em, Emulator) for em in ems):
+    if _is_emulator_like(ems):
+        return [ems]
+    if all(_is_emulator_like(em) for em in ems):
         emNames = [em.outputName for em in ems]
         emRangeLength = [len(em.ranges) for em in ems]
-        emRangeProds = [np.prod([np.diff(ran) for ran in em.ranges.values()]) for em in ems]
+        emRangeProds = [np.prod([np.diff(ran)[0] for ran in em.ranges.values()]) for em in ems]
         if targets is None:
             whichOrder = list(set(['p', 'v']).intersection(ordering))
         else:
@@ -120,7 +127,7 @@ def getRanges(ems, minimal = True):
     rangeWidths = np.full((len(ems), max(rangeLengths)), 0, dtype = 'float')
     for i in range(len(ems)):
         for j in range(max(rangeLengths)):
-            rangeWidths[i, j] = np.diff(list(ems[i].ranges.values())[j])
+            rangeWidths[i, j] = np.diff(list(ems[i].ranges.values())[j])[0]
     if minimal:
         whichChoose = np.apply_along_axis(np.argmin, 0, rangeWidths)
     else:

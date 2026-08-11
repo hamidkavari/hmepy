@@ -210,13 +210,18 @@ def hyperparameterEstimate(inputs, outputs, model, hpRange,
         bestParams = bestPoint.append(delta)
     else:
         if corrName == "matern":
-            gridSearch = np.array([(x,y) for x in np.arange(hpRange['theta'][0], hpRange['theta'][1], np.diff(hpRange['theta'])/(nSteps*4)) for y in [0.5, 1.5, 2.5, 3.5]])
+            theta_step = np.diff(hpRange['theta'])[0] / (nSteps * 4)
+            gridSearch = np.array([(x,y) for x in np.arange(hpRange['theta'][0], hpRange['theta'][1], theta_step) for y in [0.5, 1.5, 2.5, 3.5]])
         else:
             if len(hpRange) == 1:
-                gridSearch = np.array(np.arange(list(hpRange.values())[0][0], list(hpRange.values())[0][1], np.diff(list(hpRange.values())[0])/(nSteps*4)))
+                first_range = list(hpRange.values())[0]
+                first_step = np.diff(first_range)[0] / (nSteps * 4)
+                gridSearch = np.array(np.arange(first_range[0], first_range[1], first_step))
             if len(hpRange) == 2:
-                firstRange = np.arange(list(hpRange.values())[0][0], list(hpRange.values())[0][1], np.diff(list(hpRange.values())[0])/nSteps)
-                secondRange = np.arange(list(hpRange.values())[1][0], list(hpRange.values())[1][1], np.diff(list(hpRange.values())[1])/nSteps)
+                first_range = list(hpRange.values())[0]
+                second_range = list(hpRange.values())[1]
+                firstRange = np.arange(first_range[0], first_range[1], np.diff(first_range)[0] / nSteps)
+                secondRange = np.arange(second_range[0], second_range[1], np.diff(second_range)[0] / nSteps)
                 gridSearch = np.array([(x,y) for x in firstRange for y in secondRange])
         if delta is None:
             dval = 0.01

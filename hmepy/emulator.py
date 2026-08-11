@@ -669,7 +669,8 @@ class Emulator:
         outString = outString + "\tRegression Surface Expectation: "
         outString = outString + "; ".join(str(round(b, 4)) for b in self.bMu) + "\n"
         outString = outString + "\tRegression Surface Variance (Eigenvalues): "
-        outString = outString + "(" + "; ".join(str(round(ev, 4)) for ev in np.linalg.eigvals(self.bSig)) + ")\n"
+        eigvals = np.real_if_close(np.linalg.eigvals(self.bSig))
+        outString = outString + "(" + "; ".join(str(round(float(ev), 4)) for ev in eigvals) + ")\n"
         outString = outString + "Correlation Structure:\n"
         if hasattr(self, 'dCorrs'):
             outString = outString + "Bayes-adjusted emulator - prior specifications listed.\n"

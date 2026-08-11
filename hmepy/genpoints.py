@@ -11,6 +11,13 @@ from hmepy.utils import *
 from hmepy.emutils import *
 from hmepy.implausibility import *
 
+class OptionDict(dict):
+    def __getattr__(self, name):
+        try:
+            return self[name]
+        except KeyError as exc:
+            raise AttributeError(name) from exc
+
 ## Helper for generating random numbers from a uniform sphere
 def runifs(n, d, c = None, r = 1):
     if c is None:
@@ -56,7 +63,9 @@ def pcaTransform(x, sPoints, forward = True):
     spMean = np.apply_along_axis(statistics.mean, 0, sPoints)
     spSD = np.apply_along_axis(statistics.stdev, 0, sPoints)
     sTraf = np.apply_along_axis(lambda y: (y - spMean)/spSD, 1, sPoints)
-    sEvals, sEvecs = np.linalg.eig(np.cov(sTraf, rowvar = False))
+    sEvals, sEvecs = np.linalg.eigh(np.cov(sTraf, rowvar = False))
+    sEvals = np.real_if_close(sEvals).astype(float)
+    sEvecs = np.real_if_close(sEvecs).astype(float)
     sEvals[sEvals < 1e-10] = 1e-10
     if forward:
         xMean = np.apply_along_axis(statistics.mean, 0, x)
@@ -203,9 +212,11 @@ def generateNewDesign(ems, nPoints, z, method = "default", cutoff = 3,
     '''
     
     if opts is None:
-        opts = kwargs
+        opts = OptionDict(kwargs)
     else:
-        opts = kwargs | opts
+        opts = OptionDict(kwargs | opts)
+    if "cutoffInfo" in opts and "cutoff_info" not in opts:
+        opts["cutoff_info"] = opts["cutoffInfo"]
     if not hasattr(opts, 'accept_measure'): opts['accept_measure'] = "default"
     if hasattr(opts, "cluster"):
         if opts['cluster'] == 1: opts['cluster'] = True
@@ -240,6 +251,7 @@ def generateNewDesign(ems, nPoints, z, method = "default", cutoff = 3,
     if hasattr(opts, 'use_collect') and opts['use_collect']:
         ems = collectEmulators(ems)
     theseRanges = getRanges(ems)
+    range_names = list(theseRanges.keys())
     if opts['nth'] is None:
         nems = len(np.unique([e.outputName for e in ems]))
         if nems > 10: opts['nth'] = 2
@@ -353,7 +365,7 @@ def generateNewDesign(ems, nPoints, z, method = "default", cutoff = 3,
         if isinstance(whichMethods, str) and whichMethods == "lhs":
             if verbose: print("Could not generate points to desired cutoff.")
             return points
-        newOpts = opts
+        newOpts = OptionDict(opts.copy())
         newOpts['chain_call'] = True
         newOpts['resample'] = 0
         points = generateNewDesign(ems, nPoints, z, [meth for meth in whichMethods if not(meth == "lhs")],
@@ -362,9 +374,12 @@ def generateNewDesign(ems, nPoints, z, method = "default", cutoff = 3,
     else:
         if thisCutoff != cutoff:
             if verbose: print("Point implausibilities within tolerance; proposed points have maximum implausibility " + str(round(thisCutoff, 4)))
-    if hasattr(points, 'cutoff'):
+    if isinstance(points, dict) and "points" in points and "cutoff" in points:
         cutoff = points['cutoff']
         points = points['points']
+    if isinstance(points, pd.DataFrame) and points.shape[1] == len(range_names):
+        points = points.copy()
+        points.columns = range_names
     if opts['resample'] > 0 and len(list(set(whichMethods).intersection({"importance", "line", "slice"}))) > 0:
         for nsamp in range(opts['resample']):
             points = maximinSample(points, min(np.shape(points)[0], math.ceil(nPoints/2)))
@@ -391,6 +406,9 @@ def generateNewDesign(ems, nPoints, z, method = "default", cutoff = 3,
     if np.shape(points)[0] > nPoints:
         if verbose: print("Selecting final points using maximin criteriion...")
         points = maximinSample(points, nPoints)
+    if isinstance(points, pd.DataFrame) and points.shape[1] == len(range_names):
+        points = points.copy()
+        points.columns = range_names
     if hasattr(opts, 'chain_call') and opts['chain_call']:
         return {'points': points, 'cutoff': cutoff}
     return points
@@ -488,6 +506,9 @@ def lineSample(ems, ranges, z, sPoints, cutoff = 3, opts = None):
         pp = propPoints[i]
         isInRange = inRange(pp, ranges)
         propPoints[i] = pp.iloc[isInRange]
+    propPoints = [pPoint for pPoint in propPoints if np.shape(pPoint)[0] > 0]
+    if len(propPoints) == 0:
+        return sPoints
     if isinstance(opts['accept_measure'], str) and opts['accept_measure'] == "default":
         imps = [nthImplausible(ems, sp, z, n = opts['nth'], cutoff = cutoff) for sp in propPoints]
     else:
@@ -521,7 +542,7 @@ def importanceSample(ems, nPoints, z, sPoints, cutoff = 3, opts = None):
                 pp[i,:] = multivariate_normal.rvs(wp.iloc[i,:], sd, size = 1)
         else:
             for i in range(np.shape(pp)[0]):
-                pp[i:,] = runifs(1, np.shape(pp)[1], wp.iloc[i,:], sd)
+                pp[i,:] = runifs(1, np.shape(pp)[1], wp.iloc[i,:], sd)
         pp = pd.DataFrame(pp, columns = wp.columns)
         backTraf = pcaTransform(pp, sPoints, False)
         ir = inRange(backTraf, ranges)
@@ -537,8 +558,8 @@ def importanceSample(ems, nPoints, z, sPoints, cutoff = 3, opts = None):
             weights = minWeight/tWeights
         else:
             weights = [np.sum([punifs(pp.iloc[i,:], spTrafo.iloc[j,:], sd) for j in range(np.shape(spTrafo)[0])]) for i in range(np.shape(pp)[0])]
-        allow = [np.random.uniform(size = 1) <= 1/weight for weight in weights]
-        accepted = allow and valid
+        allow = [np.random.uniform() <= 1 / float(weight) if float(weight) > 0 else False for weight in weights]
+        accepted = [a and v for a, v in zip(allow, valid)]
         return backTraf.iloc[accepted,:]
     if opts['imp_distro'] == "normal" and not(len(np.shape(opts['imp_scale'])) == 2):
         sd = np.diag(np.full(len(ranges), opts['imp_scale'], dtype = 'float'))
