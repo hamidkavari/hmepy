@@ -79,7 +79,7 @@ def pcaTransform(x, sPoints, forward = True):
 
 def generateNewDesign(ems, nPoints, z, method = "default", cutoff = 3,
                       plausibleSet = None, verbose = False, opts = None,
-                      **kwargs):
+                      ranges = None, **kwargs):
     '''
     Generate Proposal Points
 
@@ -248,12 +248,21 @@ def generateNewDesign(ems, nPoints, z, method = "default", cutoff = 3,
         opts['seek'] = nPoints
     if not hasattr(opts, 'cutoff_info'): minCut = cutoff
     else: minCut = opts['cutoff_info'][0]
-    if hasattr(opts, 'use_collect') and opts['use_collect']:
-        ems = collectEmulators(ems)
-    theseRanges = getRanges(ems)
+    isModel = callable(ems)
+    if not isModel:
+        if hasattr(opts, 'use_collect') and opts['use_collect']:
+            ems = collectEmulators(ems)
+        theseRanges = getRanges(ems)
+    else:
+        if ranges is None:
+            raise ValueError("Ranges not defined for model history matching.")
+        theseRanges = ranges
     range_names = list(theseRanges.keys())
     if opts['nth'] is None:
-        nems = len(np.unique([e.outputName for e in ems]))
+        if isModel:
+            nems = len(np.unique(list(z.keys())))
+        else:
+            nems = len(np.unique([e.outputName for e in ems]))
         if nems > 10: opts['nth'] = 2
         else: opts['nth'] = 1
     if callable(opts['accept_measure']):
@@ -360,7 +369,7 @@ def generateNewDesign(ems, nPoints, z, method = "default", cutoff = 3,
         nCurrent = np.shape(points)[0]
     if "importance" in whichMethods and nCurrent < nPoints:
         if verbose: print("Performing importance sampling...")
-        points = importanceSample(ems, nPoints, z, points, cutoff = thisCutoff, opts = opts)
+        points = importanceSample(ems, theseRanges, nPoints, z, points, cutoff = thisCutoff, opts = opts)
         if verbose: print("Importance sampling generated " + str(np.shape(points)[0] - nCurrent) + " more points.")
         nCurrent = np.shape(points)[0]
     if thisCutoff - cutoff > opts['cutoff_tolerance']:
@@ -372,7 +381,8 @@ def generateNewDesign(ems, nPoints, z, method = "default", cutoff = 3,
         newOpts['resample'] = 0
         points = generateNewDesign(ems, nPoints, z, [meth for meth in whichMethods if not(meth == "lhs")],
                                cutoff = cutoff, plausibleSet = points, verbose = verbose,
-                               opts = newOpts, cutoffInfo = [minCut, thisCutoff])
+                               opts = newOpts, cutoffInfo = [minCut, thisCutoff],
+                               ranges = ranges)
     else:
         if thisCutoff != cutoff:
             if verbose: print("Point implausibilities within tolerance; proposed points have maximum implausibility " + str(round(thisCutoff, 4)))
@@ -399,7 +409,7 @@ def generateNewDesign(ems, nPoints, z, method = "default", cutoff = 3,
                 nCurrent = np.shape(points)[0]
             if "importance" in whichMethods and nCurrent < nPoints:
                 if verbose: print("Performing importance sampling...")
-                points = importanceSample(ems, nPoints, z, points, cutoff = cutoff, opts = opts)
+                points = importanceSample(ems, theseRanges, nPoints, z, points, cutoff = cutoff, opts = opts)
                 if verbose: print("Importance sampling generated " + str(np.shape(points)[0] - nCurrent) + " more points.")
                 nCurrent = np.shape(points)[0]
     if opts['seek'] > 0:
@@ -424,7 +434,7 @@ def lhsGen(ems, ranges, nPoints, z, cutoff = 3, verbose = False, opts = None):
     if not hasattr(opts, 'pca_lhs'): opts['pca_lhs'] = False
     if not isinstance(opts['pca_lhs'], bool): opts['pca_lhs'] = False
     lhSampler = qmc.LatinHypercube(len(ranges))
-    if opts['pca_lhs']:
+    if opts['pca_lhs'] and not callable(ems):
         trainPoints = ems[0].inData
         initRanges = ems[0].ranges
         actualPoints = evalFuncs(scaleInput, trainPoints, initRanges, False)
@@ -522,7 +532,7 @@ def lineSample(ems, ranges, z, sPoints, cutoff = 3, opts = None):
     outPoints = pd.concat(acceptPoints)
     return pd.concat([sPoints, outPoints]).drop_duplicates()
 
-def importanceSample(ems, nPoints, z, sPoints, cutoff = 3, opts = None):
+def importanceSample(ems, ranges, nPoints, z, sPoints, cutoff = 3, opts = None):
     if opts is None:
         opts = {'imp_distro': 'sphere', 'imp_scale': 2}
     if not hasattr(opts, 'imp_distro'): opts['imp_distro'] = 'sphere'
@@ -533,7 +543,8 @@ def importanceSample(ems, nPoints, z, sPoints, cutoff = 3, opts = None):
     if np.shape(sPoints)[0] >= nPoints:
         return sPoints
     mPoints = nPoints - np.shape(sPoints)[0]
-    ranges = getRanges(ems, False)
+    if not callable(ems):
+        ranges = getRanges(ems, False)
     newPoints = sPoints
     def propPoints(sp, sd, howmany = nPoints):
         spTrafo = pcaTransform(sp, sPoints)
