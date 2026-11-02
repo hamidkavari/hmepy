@@ -1,0 +1,14 @@
+{
+  "name": "hmepy",
+  "image": "mcr.microsoft.com/devcontainers/python:3.13",
+  "features": {
+    "ghcr.io/va-h/devcontainers-features/uv:1": {}
+  },
+  "postCreateCommand": "uv venv && uv pip install -e . jupyter ipykernel python-dotenv scipy pytest",
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-python.python", "ms-toolsai.jupyter"],
+      "settings": { "python.defaultInterpreterPath": "${containerWorkspaceFolder}/.venv/bin/python" }
+    }
+  }
+}
