@@ -14,6 +14,21 @@ dependencies = [
     "matplotlib",
 ]
 
+[project.optional-dependencies]
+# Extra dependencies needed to run the notebooks in mirico/
+# (versions/sources follow pyproject_all.toml).
+mirico = [
+    "scipy>=1.16.3",
+    "python-dotenv>=1.0.1",
+    "plotly>=6.5.0",
+    "mipyelq",  # provides the `pyelq` package
+    "pyblobtools",
+]
+
+[tool.uv.sources]
+mipyelq = { git = "https://github.com/MiricoLtd/mipyelq.git" }
+pyblobtools = { git = "https://github.com/MiricoLtd/pyblobtools.git", branch = "add-hf_temp-loader" }
+
 [tool.hatch.build.targets.wheel]
 packages = ["hmepy"]
 

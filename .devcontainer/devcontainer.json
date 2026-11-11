@@ -4,7 +4,8 @@
   "features": {
     "ghcr.io/va-h/devcontainers-features/uv:1": {}
   },
-  "postCreateCommand": "uv venv && uv pip install -e . jupyter ipykernel python-dotenv scipy pytest",
+  "containerEnv": { "UV_LINK_MODE": "copy" },
+  "postCreateCommand": "uv venv && uv pip install -e \".[mirico]\" jupyter ipykernel pytest",
   "customizations": {
     "vscode": {
       "extensions": ["ms-python.python", "ms-toolsai.jupyter"],
